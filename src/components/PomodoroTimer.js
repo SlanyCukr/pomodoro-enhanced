@@ -77,6 +77,7 @@ const PomodoroTimer = () => {
     if (soundRefPomodoroEnd.current) {
       // Restart the sound in case it was played before
       soundRefPomodoroEnd.current.currentTime = 0;
+      soundRefPomodoroEnd.current.volume = 0.5;
       soundRefPomodoroEnd.current.play().catch((err) => {
         // Some browsers block autoplay until the user interacts with the page.
         console.error('Audio playback failed:', err);
