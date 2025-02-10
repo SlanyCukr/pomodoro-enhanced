@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Box, Input, Field, Heading, Highlight } from '@chakra-ui/react';
+import { Button, Box, Input, Field, Heading } from '@chakra-ui/react';
 import {
   DialogRoot,
   DialogTrigger,
