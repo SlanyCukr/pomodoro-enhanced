@@ -43,10 +43,10 @@ const PomodoroTimer = () => {
   // Create audio elements on mount (place your sound files in the public folder)
   useEffect(() => {
     if (!soundRefPomodoroStart.current) {
-      soundRefPomodoroStart.current = new Audio('/pomodoro_end.wav');
+      soundRefPomodoroStart.current = new Audio('/pomodoro_start.wav');
     }
     if (!soundRefPomodoroEnd.current) {
-      soundRefPomodoroEnd.current = new Audio('/pomodoro_start.wav');
+      soundRefPomodoroEnd.current = new Audio('/pomodoro_stop.wav');
     }
   }, []);
 
