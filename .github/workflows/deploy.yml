@@ -1,0 +1,33 @@
+name: Deploy to Raspberry Pi
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Update local repository
+        run: |
+          # Navigate to the project directory
+          cd /home/pi/pomodoro-enhanced
+
+          # Pull the latest code
+          git pull origin main
+
+      - name: Rebuild Docker image
+        run: |
+          cd /home/pi/pomodoro-enhanced
+          docker build -t pomodoro-enhanced:latest .
+
+      - name: Restart daemon service
+        run: |
+          # The daemon will handle the Docker container management
+          sudo systemctl restart pomodoro-enhanced.service
