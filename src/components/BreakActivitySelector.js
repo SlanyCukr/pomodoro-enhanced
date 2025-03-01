@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Button, List } from '@chakra-ui/react';
+import React, { useState } from 'react';
+import { Button, Box } from '@chakra-ui/react';
 import {
   DialogRoot,
   DialogContent,
@@ -8,40 +8,60 @@ import {
   DialogBody,
   DialogCloseTrigger,
 } from '@/components/ui/dialog';
+import SpinningWheel from './SpinningWheel';
+import ActivityList from './ActivityList';
 
 const BreakActivitySelector = ({ isOpen, onClose, breakActivities, onSelect }) => {
+  const [showWheel, setShowWheel] = useState(false);
+  const [showActivityList, setShowActivityList] = useState(false);
+
+  const handleSpinEnd = (activity) => {
+    onSelect(activity);
+    onClose();
+  };
+
+  const showSpin = () => {
+    setShowWheel(true);
+    setShowActivityList(false);
+  };
+
+  const showList = () => {
+    setShowWheel(false);
+    setShowActivityList(true);
+  };
+
   return (
-    <DialogRoot open={isOpen}>
+    <DialogRoot open={isOpen} size="lg">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Select a Break Activity</DialogTitle>
+          <DialogTitle>
+            {showWheel ? 'Spin for Random Activity' : 'Select Break Activity'}
+          </DialogTitle>
         </DialogHeader>
         <DialogBody>
-          {Object.keys(breakActivities).map((group) => (
-            <Box key={group} mb={4}>
-              <Box fontWeight="bold" mb={2}>
-                {group}
-              </Box>
-              <List.Root spacing={2}>
-                {breakActivities[group].map((activity, index) => (
-                  <List.Item key={index}>
-                    <Button
-                      variant="outline"
-                      width="100%"
-                      onClick={() => {
-                        onSelect(activity);
-                        onClose();
-                      }}
-                    >
-                      {activity}
-                    </Button>
-                  </List.Item>
-                ))}
-              </List.Root>
-            </Box>
-          ))}
+          <Box className="space-y-4">
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <Button colorScheme="blue" onClick={showSpin} flex="1">
+                Spin Random
+              </Button>
+              <Button colorScheme="blue" onClick={showList} flex="1">
+                Select from List
+              </Button>
+            </div>
+          </Box>
+
+          {showWheel && <SpinningWheel activities={breakActivities} onSpinEnd={handleSpinEnd} />}
+
+          {showActivityList && (
+            <ActivityList
+              breakActivities={breakActivities}
+              onSelect={onSelect}
+              onClose={onClose}
+              showActivityList={showActivityList}
+            />
+          )}
         </DialogBody>
-        <DialogCloseTrigger />
+        <DialogCloseTrigger onClick={onClose} />
       </DialogContent>
     </DialogRoot>
   );

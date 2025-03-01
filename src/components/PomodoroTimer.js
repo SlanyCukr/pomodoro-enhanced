@@ -1,10 +1,9 @@
 // components/PomodoroTimer.js
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Button, Heading, Text, HStack, ProgressCircle } from '@chakra-ui/react';
 import { LuArrowRight } from 'react-icons/lu';
-import SettingsPanel from './SettingsPanel';
 import BreakActivitySelector from './BreakActivitySelector';
 
 const PomodoroTimer = () => {
@@ -40,39 +39,8 @@ const PomodoroTimer = () => {
   // Ref to store the audio element for end sound
   const soundRefPomodoroEnd = useRef(null);
 
-  // Create audio elements on mount (place your sound files in the public folder)
-  useEffect(() => {
-    if (!soundRefPomodoroStart.current) {
-      soundRefPomodoroStart.current = new Audio('/pomodoro_start.wav');
-    }
-    if (!soundRefPomodoroEnd.current) {
-      soundRefPomodoroEnd.current = new Audio('/pomodoro_stop.wav');
-    }
-  }, []);
-
-  // Update the browser tab title whenever timeLeft or mode changes
-  useEffect(() => {
-    document.title = `${formatTime(timeLeft)} - ${mode === 'work' ? 'Work' : 'Break'}`;
-  }, [timeLeft, mode]);
-
-  // Timer effect
-  useEffect(() => {
-    if (isRunning) {
-      timerId.current = setInterval(() => {
-        setTimeLeft((prevTime) => {
-          if (prevTime > 0) return prevTime - 1;
-          else {
-            handleTimerComplete();
-            return 0;
-          }
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timerId.current);
-  }, [isRunning]);
-
   // Function to send a desktop notification and play sound
-  const notifyUser = (message) => {
+  const notifyUser = useCallback((message) => {
     // Play the sound if available
     if (soundRefPomodoroEnd.current) {
       // Restart the sound in case it was played before
@@ -95,9 +63,9 @@ const PomodoroTimer = () => {
         }
       });
     }
-  };
+  }, []);
 
-  const handleTimerComplete = () => {
+  const handleTimerComplete = useCallback(() => {
     clearInterval(timerId.current);
     setIsRunning(false);
     if (mode === 'work') {
@@ -109,7 +77,79 @@ const PomodoroTimer = () => {
       setTimeLeft(workDuration);
       setSelectedBreakActivity('');
     }
-  };
+  }, [mode, notifyUser, workDuration]);
+
+  // Create audio elements on mount (place your sound files in the public folder)
+  useEffect(() => {
+    if (!soundRefPomodoroStart.current) {
+      soundRefPomodoroStart.current = new Audio('/pomodoro_start.wav');
+    }
+    if (!soundRefPomodoroEnd.current) {
+      soundRefPomodoroEnd.current = new Audio('/pomodoro_stop.wav');
+    }
+
+    // Load settings from localStorage
+    const savedSettings = localStorage.getItem('pomodoroSettings');
+    if (savedSettings) {
+      try {
+        const parsedSettings = JSON.parse(savedSettings);
+        setWorkDuration(parsedSettings.workDuration);
+        setBreakDuration(parsedSettings.breakDuration);
+        setBreakActivities(parsedSettings.breakActivities);
+        // Update timeLeft based on current mode
+        setTimeLeft(mode === 'work' ? parsedSettings.workDuration : parsedSettings.breakDuration);
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+  }, [mode]); // Include mode as a dependency since it's used in the effect
+
+  // Update the browser tab title whenever timeLeft or mode changes
+  useEffect(() => {
+    document.title = `${formatTime(timeLeft)} - ${mode === 'work' ? 'Work' : 'Break'}`;
+  }, [timeLeft, mode]);
+
+  // Timer effect
+  useEffect(() => {
+    if (isRunning) {
+      timerId.current = setInterval(() => {
+        setTimeLeft((prevTime) => {
+          if (prevTime > 0) return prevTime - 1;
+          else {
+            handleTimerComplete();
+            return 0;
+          }
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timerId.current);
+  }, [isRunning, handleTimerComplete]);
+
+  // Listen for settings changes
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'pomodoroSettings') {
+        try {
+          const parsedSettings = JSON.parse(e.newValue);
+          setWorkDuration(parsedSettings.workDuration);
+          setBreakDuration(parsedSettings.breakDuration);
+          setBreakActivities(parsedSettings.breakActivities);
+
+          // Only update the current timer if it's not running
+          if (!isRunning) {
+            setTimeLeft(
+              mode === 'work' ? parsedSettings.workDuration : parsedSettings.breakDuration
+            );
+          }
+        } catch (error) {
+          console.error('Error processing settings change:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isRunning, mode]);
 
   const handleBreakActivitySelect = (activity) => {
     setSelectedBreakActivity(activity);
@@ -167,7 +207,7 @@ const PomodoroTimer = () => {
 
   return (
     <Box p={10} shadow="lg" borderWidth="1px" borderRadius="lg" textAlign="center">
-      <Heading mb={6} fontSize="5xl">
+      <Heading mb={6} fontSize="4xl">
         {mode === 'work' ? 'Work Session' : 'Break Time'}
       </Heading>
       {mode === 'break' && selectedBreakActivity && (
@@ -200,21 +240,11 @@ const PomodoroTimer = () => {
           <LuArrowRight />
         </Button>
       </HStack>
-      <SettingsPanel
-        workDuration={workDuration}
-        breakDuration={breakDuration}
-        setWorkDuration={setWorkDuration}
-        setBreakDuration={setBreakDuration}
-        breakActivities={breakActivities}
-        setBreakActivities={setBreakActivities}
-        onSave={() => {
-          setTimeLeft(mode === 'work' ? workDuration : breakDuration);
-        }}
-      />
+
       <BreakActivitySelector
         isOpen={isBreakActivityModalOpen}
         onClose={() => setIsBreakActivityModalOpen(false)}
-        breakActivities={breakActivities} // make sure this prop is passed from your parent or state
+        breakActivities={breakActivities}
         onSelect={handleBreakActivitySelect}
       />
     </Box>
