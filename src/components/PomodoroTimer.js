@@ -7,28 +7,18 @@ import { LuArrowRight } from 'react-icons/lu';
 import BreakActivitySelector from './BreakActivitySelector';
 
 const PomodoroTimer = () => {
-  // Component state
-  const [workDuration, setWorkDuration] = useState(25 * 60);
-  const [breakDuration, setBreakDuration] = useState(5 * 60);
-
-  const [timeLeft, setTimeLeft] = useState(workDuration);
+  // Initialize state with null values, will be set from localStorage
+  const [workDuration, setWorkDuration] = useState(null);
+  const [breakDuration, setBreakDuration] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState('work'); // 'work' or 'break'
 
-  const [breakActivities, setBreakActivities] = useState({
-    Yellow: [
-      'Kitchen cleaning',
-      'Take out trash',
-      'Short walk',
-      'Watch candle',
-      'Short meditation',
-      'Plan more tasks for the day',
-    ],
-    Blue: ['Youtube shorts', 'Instagram reels', 'Read short article/news'],
-    Green: ['Read a few pages from book', 'Piano', 'Learn MK1 combos', 'Journaling'],
-    Red: ['Yoga Nidra'],
-  });
+  // New overtime state
+  const [isOvertime, setIsOvertime] = useState(false);
+  const [overtimeSeconds, setOvertimeSeconds] = useState(0);
 
+  const [breakActivities, setBreakActivities] = useState(null);
   const [selectedBreakActivity, setSelectedBreakActivity] = useState('');
   const [isBreakActivityModalOpen, setIsBreakActivityModalOpen] = useState(false);
 
@@ -38,6 +28,8 @@ const PomodoroTimer = () => {
   const soundRefPomodoroStart = useRef(null);
   // Ref to store the audio element for end sound
   const soundRefPomodoroEnd = useRef(null);
+  // Flag to track if settings have been loaded
+  const settingsLoaded = useRef(false);
 
   // Function to send a desktop notification and play sound
   const notifyUser = useCallback((message) => {
@@ -65,21 +57,7 @@ const PomodoroTimer = () => {
     }
   }, []);
 
-  const handleTimerComplete = useCallback(() => {
-    clearInterval(timerId.current);
-    setIsRunning(false);
-    if (mode === 'work') {
-      notifyUser('Work session complete! Please select a break activity.');
-      setIsBreakActivityModalOpen(true);
-    } else {
-      notifyUser('Break over! Time to work.');
-      setMode('work');
-      setTimeLeft(workDuration);
-      setSelectedBreakActivity('');
-    }
-  }, [mode, notifyUser, workDuration]);
-
-  // Create audio elements on mount (place your sound files in the public folder)
+  // Load settings from localStorage on component mount
   useEffect(() => {
     if (!soundRefPomodoroStart.current) {
       soundRefPomodoroStart.current = new Audio('/pomodoro_start.wav');
@@ -88,44 +66,112 @@ const PomodoroTimer = () => {
       soundRefPomodoroEnd.current = new Audio('/pomodoro_stop.wav');
     }
 
+    // Default settings to use if none are found in localStorage
+    const defaultSettings = {
+      workDuration: 30 * 60, // 30 minutes
+      breakDuration: 8 * 60, // 8 minutes
+      breakActivities: {
+        Yellow: [
+          'Kitchen cleaning',
+          'Take out trash',
+          'Short walk',
+          'Watch candle',
+          'Short meditation',
+          'Plan more tasks for the day',
+        ],
+        Blue: ['Youtube shorts', 'Instagram reels', 'Read short article/news'],
+        Green: ['Read a few pages from book', 'Piano', 'Learn MK1 combos', 'Journaling'],
+        Red: ['Yoga Nidra'],
+      },
+    };
+
     // Load settings from localStorage
     const savedSettings = localStorage.getItem('pomodoroSettings');
+    let settings;
+
     if (savedSettings) {
       try {
-        const parsedSettings = JSON.parse(savedSettings);
-        setWorkDuration(parsedSettings.workDuration);
-        setBreakDuration(parsedSettings.breakDuration);
-        setBreakActivities(parsedSettings.breakActivities);
-        // Update timeLeft based on current mode
-        setTimeLeft(mode === 'work' ? parsedSettings.workDuration : parsedSettings.breakDuration);
+        settings = JSON.parse(savedSettings);
       } catch (error) {
-        console.error('Error loading settings:', error);
+        console.error('Error parsing settings from localStorage:', error);
+        settings = defaultSettings;
       }
+    } else {
+      settings = defaultSettings;
     }
-  }, [mode]); // Include mode as a dependency since it's used in the effect
 
-  // Update the browser tab title whenever timeLeft or mode changes
+    // Set state with loaded or default settings
+    setWorkDuration(settings.workDuration);
+    setBreakDuration(settings.breakDuration);
+    setBreakActivities(settings.breakActivities);
+    setTimeLeft(settings.workDuration); // Start with work duration
+
+    settingsLoaded.current = true;
+  }, []); // Only run on mount
+
+  const handleTimerComplete = useCallback(() => {
+    if (mode === 'work') {
+      // For work mode, start tracking overtime instead of stopping
+      notifyUser('Work session complete! You are now in overtime.');
+      setIsOvertime(true);
+      setOvertimeSeconds(0);
+      // Continue running the timer for overtime tracking
+
+      // We don't clear the interval or stop the timer
+    } else {
+      // For break mode, behavior remains the same
+      clearInterval(timerId.current);
+      setIsRunning(false);
+      notifyUser('Break over! Time to work.');
+      setMode('work');
+      setTimeLeft(workDuration);
+      setSelectedBreakActivity('');
+      setIsOvertime(false);
+      setOvertimeSeconds(0);
+    }
+  }, [mode, notifyUser, workDuration]);
+
+  // Update the browser tab title whenever timeLeft, overtime or mode changes
   useEffect(() => {
-    document.title = `${formatTime(timeLeft)} - ${mode === 'work' ? 'Work' : 'Break'}`;
-  }, [timeLeft, mode]);
+    if (timeLeft === null) return; // Don't update title until settings are loaded
+
+    if (isOvertime && mode === 'work') {
+      document.title = `+${formatTime(overtimeSeconds)} OT - Work`;
+    } else {
+      document.title = `${formatTime(timeLeft)} - ${mode === 'work' ? 'Work' : 'Break'}`;
+    }
+  }, [timeLeft, mode, isOvertime, overtimeSeconds]);
 
   // Timer effect
   useEffect(() => {
-    if (isRunning) {
+    if (isRunning && timeLeft !== null) {
       timerId.current = setInterval(() => {
-        setTimeLeft((prevTime) => {
-          if (prevTime > 0) return prevTime - 1;
-          else {
-            handleTimerComplete();
-            return 0;
-          }
-        });
+        if (isOvertime && mode === 'work') {
+          // In overtime mode for work, increment the overtime counter
+          setOvertimeSeconds((prevOT) => {
+            // Check if we need to send a reminder notification
+            if ((prevOT + 1) % 300 === 0) {
+              // Every 5 minutes (300 seconds)
+              notifyUser('Overtime reminder: Check your work emails or team chat');
+            }
+            return prevOT + 1;
+          });
+        } else {
+          // Regular timer countdown
+          setTimeLeft((prevTime) => {
+            if (prevTime > 0) return prevTime - 1;
+            else {
+              handleTimerComplete();
+              return 0;
+            }
+          });
+        }
       }, 1000);
     }
     return () => clearInterval(timerId.current);
-  }, [isRunning, handleTimerComplete]);
+  }, [isRunning, handleTimerComplete, isOvertime, mode, notifyUser, timeLeft]);
 
-  // Listen for settings changes
+  // Listen for settings changes from other tabs or windows
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'pomodoroSettings') {
@@ -151,11 +197,20 @@ const PomodoroTimer = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [isRunning, mode]);
 
+  // Effect to handle mode changes - update timeLeft when mode changes
+  useEffect(() => {
+    if (!isRunning && workDuration !== null && breakDuration !== null) {
+      setTimeLeft(mode === 'work' ? workDuration : breakDuration);
+    }
+  }, [mode, workDuration, breakDuration, isRunning]);
+
   const handleBreakActivitySelect = (activity) => {
     setSelectedBreakActivity(activity);
     setMode('break');
     setTimeLeft(breakDuration);
     setIsBreakActivityModalOpen(false);
+    setIsOvertime(false);
+    setOvertimeSeconds(0);
   };
 
   // Toggle start/pause and play start sound if starting
@@ -175,6 +230,8 @@ const PomodoroTimer = () => {
     clearInterval(timerId.current);
     setIsRunning(false);
     setTimeLeft(mode === 'work' ? workDuration : breakDuration);
+    setIsOvertime(false);
+    setOvertimeSeconds(0);
   };
 
   // Function to handle a session being skipped (whether work or break)
@@ -185,6 +242,8 @@ const PomodoroTimer = () => {
       // For a work session, notify and open the break activity selector
       notifyUser('Work session skipped! Please select a break activity.');
       setIsBreakActivityModalOpen(true);
+      setIsOvertime(false);
+      setOvertimeSeconds(0);
     } else {
       // For a break session, simply notify and transition back to work
       notifyUser('Break session skipped! Time to work.');
@@ -196,19 +255,50 @@ const PomodoroTimer = () => {
 
   // Helper function to format seconds as mm:ss
   const formatTime = (seconds) => {
+    if (seconds === null) return '00:00';
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // At the top of your component (or inside your render/return), compute:
-  const currentSessionDuration = mode === 'work' ? workDuration : breakDuration;
-  const progress = ((currentSessionDuration - timeLeft) / currentSessionDuration) * 100;
+  // If settings haven't loaded yet, show a loading state
+  if (
+    timeLeft === null ||
+    workDuration === null ||
+    breakDuration === null ||
+    breakActivities === null
+  ) {
+    return (
+      <Box p={10} shadow="lg" borderWidth="1px" borderRadius="lg" textAlign="center">
+        <Heading mb={6} fontSize="4xl">
+          Loading settings...
+        </Heading>
+      </Box>
+    );
+  }
+
+  // For normal mode, compute progress percentage
+  let progress = 0;
+  let progressColor = mode === 'work' ? 'blue.400' : 'green.400';
+
+  if (isOvertime && mode === 'work') {
+    // For overtime, we don't set a progress value since we don't know how long it will be
+    progress = null;
+    progressColor = 'red.500';
+  } else {
+    // Regular progress calculation
+    const currentSessionDuration = mode === 'work' ? workDuration : breakDuration;
+    progress = ((currentSessionDuration - timeLeft) / currentSessionDuration) * 100;
+  }
 
   return (
     <Box p={10} shadow="lg" borderWidth="1px" borderRadius="lg" textAlign="center">
       <Heading mb={6} fontSize="4xl">
-        {mode === 'work' ? 'Work Session' : 'Break Time'}
+        {isOvertime && mode === 'work'
+          ? 'Work Overtime'
+          : mode === 'work'
+            ? 'Work Session'
+            : 'Break Time'}
       </Heading>
       {mode === 'break' && selectedBreakActivity && (
         <Text fontSize="lg" mt={2} mb={2}>
@@ -216,12 +306,12 @@ const PomodoroTimer = () => {
         </Text>
       )}
       <Text fontSize="5xl" mb={6}>
-        {formatTime(timeLeft)}
+        {isOvertime && mode === 'work' ? `+${formatTime(overtimeSeconds)}` : formatTime(timeLeft)}
       </Text>
       <ProgressCircle.Root size="xl" value={progress} mb={7}>
         <ProgressCircle.Circle thickness="8px">
           <ProgressCircle.Track stroke="#e2e8f0" />
-          <ProgressCircle.Range stroke={mode === 'work' ? 'blue.400' : 'green.400'} />
+          <ProgressCircle.Range stroke={progressColor} />
         </ProgressCircle.Circle>
       </ProgressCircle.Root>
       <HStack spacing={4} justify="center">

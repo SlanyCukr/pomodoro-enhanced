@@ -28,11 +28,7 @@ export default function RootLayout({ children }) {
                 <NextLink href="/free-time">Free time</NextLink>
               </ChakraLink>
               <ChakraLink asChild>
-                <NextLink href="/settings" passHref>
-                  <Button leftIcon={<LuSettings />} size="sm" variant="ghost">
-                    Settings
-                  </Button>
-                </NextLink>
+                <NextLink href="/settings">Settings</NextLink>
               </ChakraLink>
             </Box>
           </header>

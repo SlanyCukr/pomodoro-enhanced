@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button, Heading, Separator, Box } from '@chakra-ui/react';
+import safeColors from '@/utils/safeColors';
 
 const ActivityList = ({ breakActivities, onSelect, onClose, showActivityList }) => {
   if (!showActivityList) return null;
@@ -7,7 +8,10 @@ const ActivityList = ({ breakActivities, onSelect, onClose, showActivityList }) 
   return (
     <Box className="space-y-6 p-6 bg-gray-50 rounded-lg" marginTop={6}>
       {Object.entries(breakActivities).map(([group, activities], index) => (
-        <div key={group}>
+        <div
+          key={group}
+          style={{ backgroundColor: safeColors[group], padding: '16px', borderRadius: '8px' }}
+        >
           <Heading size="md" mb={4}>
             {group}
           </Heading>
@@ -22,6 +26,7 @@ const ActivityList = ({ breakActivities, onSelect, onClose, showActivityList }) 
                   onSelect(activity);
                   onClose();
                 }}
+                backgroundColor="white"
               >
                 {activity}
               </Button>

@@ -1,14 +1,34 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Container, Heading, Button, Box, Input, Field } from '@chakra-ui/react';
-import { LuArrowLeft } from 'react-icons/lu';
-import Link from 'next/link';
+import {
+  Container,
+  Heading,
+  Button,
+  Box,
+  Input,
+  Field,
+  Center,
+  Flex,
+  Text,
+  FormControl,
+  FormLabel,
+  createListCollection,
+} from '@chakra-ui/react';
+// import {
+//   SelectContent,
+//   SelectItem,
+//   SelectLabel,
+//   SelectRoot,
+//   SelectTrigger,
+//   SelectValueText,
+// } from '@/components/ui/select';
+import safeColors from '@/utils/safeColors';
 
 function SettingsPage() {
   // Component state for settings
-  const [workDuration, setWorkDuration] = useState(25 * 60);
-  const [breakDuration, setBreakDuration] = useState(5 * 60);
+  const [workDuration, setWorkDuration] = useState(30 * 60);
+  const [breakDuration, setBreakDuration] = useState(8 * 60);
   const [breakActivities, setBreakActivities] = useState({
     Yellow: [
       'Kitchen cleaning',
@@ -24,6 +44,31 @@ function SettingsPage() {
   });
   const [newActivity, setNewActivity] = useState({});
 
+  // New state for time ranges
+  const [timeRanges, setTimeRanges] = useState([]);
+  const [newTimeRange, setNewTimeRange] = useState({
+    name: '',
+    startHour: '09',
+    startMinute: '00',
+    endHour: '17',
+    endMinute: '00',
+  });
+
+  // Collections for dropdowns
+  const hoursCollection = createListCollection({
+    items: Array.from({ length: 24 }, (_, i) => ({
+      label: i.toString().padStart(2, '0'),
+      value: i.toString().padStart(2, '0'),
+    })),
+  });
+
+  const minutesCollection = createListCollection({
+    items: Array.from({ length: 60 }, (_, i) => ({
+      label: i.toString().padStart(2, '0'),
+      value: i.toString().padStart(2, '0'),
+    })),
+  });
+
   // Load settings from localStorage on component mount
   useEffect(() => {
     const savedSettings = localStorage.getItem('pomodoroSettings');
@@ -32,6 +77,7 @@ function SettingsPage() {
       setWorkDuration(parsedSettings.workDuration || workDuration);
       setBreakDuration(parsedSettings.breakDuration || breakDuration);
       setBreakActivities(parsedSettings.breakActivities || breakActivities);
+      setTimeRanges(parsedSettings.timeRanges || []);
     }
     // We're intentionally only running this on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -43,27 +89,73 @@ function SettingsPage() {
       workDuration,
       breakDuration,
       breakActivities,
+      timeRanges,
     };
     localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
     alert('Settings saved successfully!');
   };
 
-  const styles = {
-    Yellow: { bg: '#fefce8', text: '#854d0e', border: '#fef08a' },
-    Blue: { bg: '#eff6ff', text: '#1e40af', border: '#bfdbfe' },
-    Green: { bg: '#f0fdf4', text: '#166534', border: '#bbf7d0' },
-    Red: { bg: '#fef2f2', text: '#991b1b', border: '#fecaca' },
+  // Add new time range
+  const addTimeRange = () => {
+    if (newTimeRange.name.trim() === '') {
+      alert('Please enter a name for the time range');
+      return;
+    }
+
+    setTimeRanges([...timeRanges, { ...newTimeRange }]);
+    setNewTimeRange({
+      name: '',
+      startHour: '09',
+      startMinute: '00',
+      endHour: '17',
+      endMinute: '00',
+    });
+  };
+
+  // Remove time range
+  const removeTimeRange = (index) => {
+    setTimeRanges(timeRanges.filter((_, i) => i !== index));
+  };
+
+  // Styles for activity groups using safeColors with appropriate text colors
+  const getActivityGroupStyles = (group) => {
+    // Base styles using safeColors for background
+    const styles = {
+      backgroundColor: safeColors[group],
+      borderColor: safeColors[group],
+    };
+
+    // Add appropriate text colors for each group
+    switch (group) {
+      case 'Yellow':
+        styles.color = '#854d0e';
+        break;
+      case 'Blue':
+        styles.color = '#1e40af';
+        break;
+      case 'Green':
+        styles.color = '#166534';
+        break;
+      case 'Red':
+        styles.color = '#991b1b';
+        break;
+      case 'Purple':
+        styles.color = '#5b21b6';
+        break;
+      case 'Orange':
+        styles.color = '#9a3412';
+        break;
+      default:
+        styles.color = '#1f2937';
+    }
+
+    return styles;
   };
 
   return (
     <Container centerContent py={8}>
       <Box display="flex" alignItems="center" width="100%" mb={4}>
-        <Link href="/" passHref>
-          <Button leftIcon={<LuArrowLeft />} variant="outline">
-            Back to Timer
-          </Button>
-        </Link>
-        <Heading ml="auto" mr="auto">
+        <Heading mr="auto" ml="auto" mb={8} fontSize="5xl">
           Settings
         </Heading>
       </Box>
@@ -91,10 +183,175 @@ function SettingsPage() {
           <Field.HelperText>Enter break duration in minutes</Field.HelperText>
         </Field.Root>
 
+        {/* New Time Ranges Section
+        <Box mt={6} mb={6}>
+          <Center>
+            <Heading fontSize="l" mb={4} mr="auto" ml="auto">
+              Time Ranges
+            </Heading>
+          </Center>
+
+          {timeRanges.map((range, index) => (
+            <Box key={index} mb={2} p={3} borderWidth="1px" borderRadius="md" bg="gray.50">
+              <Flex justifyContent="space-between" alignItems="center">
+                <Text fontWeight="bold">{range.name}</Text>
+                <Text>
+                  {range.startHour}:{range.startMinute} - {range.endHour}:{range.endMinute}
+                </Text>
+                <Button size="sm" colorScheme="red" onClick={() => removeTimeRange(index)}>
+                  Remove
+                </Button>
+              </Flex>
+            </Box>
+          ))}
+
+          <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="blue.50">
+            <FormControl mb={3}>
+              <FormLabel>Time Range Name</FormLabel>
+              <Input
+                placeholder="Work hours, Focus time, etc."
+                value={newTimeRange.name}
+                onChange={(e) => setNewTimeRange({ ...newTimeRange, name: e.target.value })}
+                bg="white"
+              />
+            </FormControl>
+
+            <Flex gap={3} mb={3}>
+              <FormControl flex="1">
+                <FormLabel>Start Time</FormLabel>
+                <Flex>
+                  <Box flex="1" mr={1}>
+                    <SelectRoot
+                      collection={hoursCollection}
+                      value={[newTimeRange.startHour]}
+                      onValueChange={(details) => {
+                        if (details.value[0]) {
+                          setNewTimeRange({
+                            ...newTimeRange,
+                            startHour: details.value[0],
+                          });
+                        }
+                      }}
+                      size="sm"
+                    >
+                      <SelectTrigger>
+                        <SelectValueText placeholder="Hour" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hoursCollection.items.map((hour) => (
+                          <SelectItem item={hour} key={`start-hour-${hour.value}`}>
+                            {hour.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </SelectRoot>
+                  </Box>
+                  <Text fontSize="xl" mx={1}>
+                    :
+                  </Text>
+                  <Box flex="1">
+                    <SelectRoot
+                      collection={minutesCollection}
+                      value={[newTimeRange.startMinute]}
+                      onValueChange={(details) => {
+                        if (details.value[0]) {
+                          setNewTimeRange({
+                            ...newTimeRange,
+                            startMinute: details.value[0],
+                          });
+                        }
+                      }}
+                      size="sm"
+                    >
+                      <SelectTrigger>
+                        <SelectValueText placeholder="Min" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {minutesCollection.items.map((minute) => (
+                          <SelectItem item={minute} key={`start-minute-${minute.value}`}>
+                            {minute.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </SelectRoot>
+                  </Box>
+                </Flex>
+              </FormControl>
+
+              <FormControl flex="1">
+                <FormLabel>End Time</FormLabel>
+                <Flex>
+                  <Box flex="1" mr={1}>
+                    <SelectRoot
+                      collection={hoursCollection}
+                      value={[newTimeRange.endHour]}
+                      onValueChange={(details) => {
+                        if (details.value[0]) {
+                          setNewTimeRange({
+                            ...newTimeRange,
+                            endHour: details.value[0],
+                          });
+                        }
+                      }}
+                      size="sm"
+                    >
+                      <SelectTrigger>
+                        <SelectValueText placeholder="Hour" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hoursCollection.items.map((hour) => (
+                          <SelectItem item={hour} key={`end-hour-${hour.value}`}>
+                            {hour.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </SelectRoot>
+                  </Box>
+                  <Text fontSize="xl" mx={1}>
+                    :
+                  </Text>
+                  <Box flex="1">
+                    <SelectRoot
+                      collection={minutesCollection}
+                      value={[newTimeRange.endMinute]}
+                      onValueChange={(details) => {
+                        if (details.value[0]) {
+                          setNewTimeRange({
+                            ...newTimeRange,
+                            endMinute: details.value[0],
+                          });
+                        }
+                      }}
+                      size="sm"
+                    >
+                      <SelectTrigger>
+                        <SelectValueText placeholder="Min" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {minutesCollection.items.map((minute) => (
+                          <SelectItem item={minute} key={`end-minute-${minute.value}`}>
+                            {minute.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </SelectRoot>
+                  </Box>
+                </Flex>
+              </FormControl>
+            </Flex>
+
+            <Button colorScheme="blue" size="md" width="100%" onClick={addTimeRange}>
+              Add Time Range
+            </Button>
+          </Box>
+        </Box> */}
+
         <Box mt={6}>
-          <Heading className="text-xl font-bold text-center" mb={4}>
-            Break Activities
-          </Heading>
+          <Center>
+            <Heading fontSize="l" mb={4} mr="auto" ml="auto">
+              Break Activities
+            </Heading>
+          </Center>
 
           {Object.keys(breakActivities).map((group) => (
             <Box
@@ -103,15 +360,11 @@ function SettingsPage() {
               borderWidth="1px"
               borderRadius="md"
               p={3}
-              style={{
-                backgroundColor: styles[group]?.bg,
-                borderColor: styles[group]?.border,
-              }}
+              style={getActivityGroupStyles(group)}
             >
               <Heading
                 size="md"
                 style={{
-                  color: styles[group]?.text,
                   textAlign: 'center',
                   marginBottom: '0.75rem',
                 }}
@@ -153,6 +406,7 @@ function SettingsPage() {
                   value={newActivity[group] || ''}
                   onChange={(e) => setNewActivity((prev) => ({ ...prev, [group]: e.target.value }))}
                   flex={1}
+                  bg="white"
                 />
                 <Button
                   onClick={() => {
@@ -164,6 +418,7 @@ function SettingsPage() {
                       setNewActivity((prev) => ({ ...prev, [group]: '' }));
                     }
                   }}
+                  bg="white"
                 >
                   Add
                 </Button>

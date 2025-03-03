@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Container, Heading, Box, Highlight } from '@chakra-ui/react';
 import SpinningWheel from '@/components/SpinningWheel';
+import safeColors from '@/utils/safeColors';
 
 const freeTimeActivities = {
   Yellow: [
@@ -24,11 +25,25 @@ function FreeTimePage() {
     setSelectedActivity(String(activity));
   };
 
+  // Get activity color group based on the selected activity
+  const getActivityColor = (activity) => {
+    for (const [color, activities] of Object.entries(freeTimeActivities)) {
+      if (activities.includes(activity)) {
+        return color;
+      }
+    }
+    return null;
+  };
+
   const renderSelectedActivity = () => {
     if (!selectedActivity) return null;
+
+    const activityColor = getActivityColor(selectedActivity);
+    const highlightColor = activityColor ? safeColors[activityColor] : 'teal.600';
+
     return (
       <Heading size="lg" letterSpacing="tight">
-        <Highlight query={selectedActivity} styles={{ color: 'teal.600' }}>
+        <Highlight query={selectedActivity} styles={{ backgroundColor: highlightColor }}>
           {`Selected Activity: ${selectedActivity}`}
         </Highlight>
       </Heading>
