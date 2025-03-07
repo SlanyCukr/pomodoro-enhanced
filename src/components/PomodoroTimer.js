@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Box, Button, Heading, Text, HStack, ProgressCircle } from '@chakra-ui/react';
+import { Box, Button, Heading, Text, HStack, ProgressCircle, Highlight } from '@chakra-ui/react';
 import { LuArrowRight } from 'react-icons/lu';
 import BreakActivitySelector from './BreakActivitySelector';
 
@@ -22,6 +22,9 @@ const PomodoroTimer = () => {
   const [selectedBreakActivity, setSelectedBreakActivity] = useState('');
   const [isBreakActivityModalOpen, setIsBreakActivityModalOpen] = useState(false);
 
+  const [timeRanges, setTimeRanges] = useState([]);
+  const [currentTimeRange, setCurrentTimeRange] = useState(null);
+
   // Ref to store the timer ID
   const timerId = useRef(null);
   // Ref to store the audio element for start sound
@@ -30,6 +33,12 @@ const PomodoroTimer = () => {
   const soundRefPomodoroEnd = useRef(null);
   // Flag to track if settings have been loaded
   const settingsLoaded = useRef(false);
+  // Store the timestamp when timer was started/resumed
+  const timerStartTimestamp = useRef(null);
+  // Store the timeLeft value when timer was last started/resumed
+  const timerStartTimeLeft = useRef(null);
+  // Track the previous mode to detect actual mode changes
+  const prevModeRef = useRef(mode);
 
   // Function to send a desktop notification and play sound
   const notifyUser = useCallback((message) => {
@@ -83,6 +92,7 @@ const PomodoroTimer = () => {
         Green: ['Read a few pages from book', 'Piano', 'Learn MK1 combos', 'Journaling'],
         Red: ['Yoga Nidra'],
       },
+      timeRanges: [],
     };
 
     // Load settings from localStorage
@@ -104,6 +114,7 @@ const PomodoroTimer = () => {
     setWorkDuration(settings.workDuration);
     setBreakDuration(settings.breakDuration);
     setBreakActivities(settings.breakActivities);
+    setTimeRanges(settings.timeRanges || []);
     setTimeLeft(settings.workDuration); // Start with work duration
 
     settingsLoaded.current = true;
@@ -116,7 +127,8 @@ const PomodoroTimer = () => {
       setIsOvertime(true);
       setOvertimeSeconds(0);
       // Continue running the timer for overtime tracking
-
+      timerStartTimestamp.current = Date.now();
+      timerStartTimeLeft.current = 0;
       // We don't clear the interval or stop the timer
     } else {
       // For break mode, behavior remains the same
@@ -128,6 +140,7 @@ const PomodoroTimer = () => {
       setSelectedBreakActivity('');
       setIsOvertime(false);
       setOvertimeSeconds(0);
+      timerStartTimestamp.current = null;
     }
   }, [mode, notifyUser, workDuration]);
 
@@ -142,34 +155,52 @@ const PomodoroTimer = () => {
     }
   }, [timeLeft, mode, isOvertime, overtimeSeconds]);
 
-  // Timer effect
+  // Timer effect with Date-based approach to handle background tab throttling
   useEffect(() => {
     if (isRunning && timeLeft !== null) {
+      // Store starting time and timeLeft values when timer starts
+      if (!timerStartTimestamp.current) {
+        timerStartTimestamp.current = Date.now();
+        timerStartTimeLeft.current = isOvertime && mode === 'work' ? overtimeSeconds : timeLeft;
+      }
+
       timerId.current = setInterval(() => {
+        const currentTime = Date.now();
+        const elapsedSeconds = Math.floor((currentTime - timerStartTimestamp.current) / 1000);
+
         if (isOvertime && mode === 'work') {
-          // In overtime mode for work, increment the overtime counter
-          setOvertimeSeconds((prevOT) => {
-            // Check if we need to send a reminder notification
-            if ((prevOT + 1) % 300 === 0) {
-              // Every 5 minutes (300 seconds)
-              notifyUser('Overtime reminder: Check your work emails or team chat');
-            }
-            return prevOT + 1;
-          });
+          // In overtime mode for work, increment the overtime counter based on actual elapsed time
+          const newOvertimeSeconds = timerStartTimeLeft.current + elapsedSeconds;
+
+          // Check if we need to send a reminder notification (every 5 minutes)
+          if (Math.floor(newOvertimeSeconds / 300) > Math.floor(overtimeSeconds / 300)) {
+            notifyUser('Overtime reminder: Check your work emails or team chat');
+          }
+
+          setOvertimeSeconds(newOvertimeSeconds);
         } else {
-          // Regular timer countdown
-          setTimeLeft((prevTime) => {
-            if (prevTime > 0) return prevTime - 1;
-            else {
-              handleTimerComplete();
-              return 0;
-            }
-          });
+          // Regular timer countdown based on actual elapsed time
+          const newTimeLeft = Math.max(0, timerStartTimeLeft.current - elapsedSeconds);
+
+          // Update the timeLeft
+          setTimeLeft(newTimeLeft);
+
+          // Check if timer completed
+          if (newTimeLeft === 0 && timerStartTimeLeft.current > 0) {
+            handleTimerComplete();
+          }
         }
       }, 1000);
     }
-    return () => clearInterval(timerId.current);
-  }, [isRunning, handleTimerComplete, isOvertime, mode, notifyUser, timeLeft]);
+
+    return () => {
+      clearInterval(timerId.current);
+      // Save current values if we're stopping the timer
+      if (!isRunning || timeLeft === null) {
+        timerStartTimestamp.current = null;
+      }
+    };
+  }, [isRunning, handleTimerComplete, isOvertime, mode, notifyUser, timeLeft, overtimeSeconds]);
 
   // Listen for settings changes from other tabs or windows
   useEffect(() => {
@@ -197,12 +228,43 @@ const PomodoroTimer = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [isRunning, mode]);
 
-  // Effect to handle mode changes - update timeLeft when mode changes
+  // Effect to handle actual mode changes - reset timeLeft only when mode truly changes
   useEffect(() => {
-    if (!isRunning && workDuration !== null && breakDuration !== null) {
-      setTimeLeft(mode === 'work' ? workDuration : breakDuration);
+    // If this is a genuine mode change (not just a render)
+    if (mode !== prevModeRef.current && workDuration !== null && breakDuration !== null) {
+      prevModeRef.current = mode;
+
+      // Only reset the timer if we're not currently running
+      // This prevents mode changes from affecting a running timer
+      if (!isRunning) {
+        setTimeLeft(mode === 'work' ? workDuration : breakDuration);
+      }
     }
   }, [mode, workDuration, breakDuration, isRunning]);
+
+  // Effect to update current time range
+  useEffect(() => {
+    const updateCurrentTimeRange = () => {
+      const now = new Date();
+      const currentHour = now.getHours().toString().padStart(2, '0');
+      const currentMinute = now.getMinutes().toString().padStart(2, '0');
+      const currentTime = `${currentHour}:${currentMinute}`;
+
+      const currentRange = timeRanges.find((range) => {
+        const startTime = `${range.startHour}:${range.startMinute}`;
+        const endTime = `${range.endHour}:${range.endMinute}`;
+        return currentTime >= startTime && currentTime <= endTime;
+      });
+
+      setCurrentTimeRange(currentRange);
+    };
+
+    // Update immediately and then every minute
+    updateCurrentTimeRange();
+    const interval = setInterval(updateCurrentTimeRange, 60000);
+
+    return () => clearInterval(interval);
+  }, [timeRanges]);
 
   const handleBreakActivitySelect = (activity) => {
     setSelectedBreakActivity(activity);
@@ -211,18 +273,40 @@ const PomodoroTimer = () => {
     setIsBreakActivityModalOpen(false);
     setIsOvertime(false);
     setOvertimeSeconds(0);
+    timerStartTimestamp.current = null;
   };
 
   // Toggle start/pause and play start sound if starting
   const toggleTimer = () => {
+    const willBeRunning = !isRunning;
+
     // If the timer is currently paused, play the start sound
-    if (!isRunning && soundRefPomodoroStart.current) {
+    if (willBeRunning && soundRefPomodoroStart.current) {
       soundRefPomodoroStart.current.currentTime = 0;
       soundRefPomodoroStart.current.play().catch((err) => {
         console.error('Start sound playback failed:', err);
       });
     }
-    setIsRunning((prev) => !prev);
+
+    if (willBeRunning) {
+      // Starting/resuming the timer - store current timestamp and timeLeft
+      timerStartTimestamp.current = Date.now();
+      timerStartTimeLeft.current = isOvertime && mode === 'work' ? overtimeSeconds : timeLeft;
+    } else {
+      // Pausing the timer - update timeLeft/overtimeSeconds based on actual elapsed time
+      const elapsedSeconds = Math.floor((Date.now() - timerStartTimestamp.current) / 1000);
+
+      if (isOvertime && mode === 'work') {
+        setOvertimeSeconds(timerStartTimeLeft.current + elapsedSeconds);
+      } else {
+        setTimeLeft(Math.max(0, timerStartTimeLeft.current - elapsedSeconds));
+      }
+
+      // Clear the start timestamp
+      timerStartTimestamp.current = null;
+    }
+
+    setIsRunning(willBeRunning);
   };
 
   // Reset the timer to the full duration of the current mode
@@ -232,12 +316,15 @@ const PomodoroTimer = () => {
     setTimeLeft(mode === 'work' ? workDuration : breakDuration);
     setIsOvertime(false);
     setOvertimeSeconds(0);
+    timerStartTimestamp.current = null;
   };
 
   // Function to handle a session being skipped (whether work or break)
   const skipSession = () => {
     clearInterval(timerId.current);
     setIsRunning(false);
+    timerStartTimestamp.current = null;
+
     if (mode === 'work') {
       // For a work session, notify and open the break activity selector
       notifyUser('Work session skipped! Please select a break activity.');
@@ -293,13 +380,20 @@ const PomodoroTimer = () => {
 
   return (
     <Box p={10} shadow="lg" borderWidth="1px" borderRadius="lg" textAlign="center">
-      <Heading mb={6} fontSize="4xl">
+      <Heading mb={3} fontSize="4xl">
         {isOvertime && mode === 'work'
           ? 'Work Overtime'
           : mode === 'work'
             ? 'Work Session'
             : 'Break Time'}
       </Heading>
+      {currentTimeRange && (
+        <Heading size="lg" color="gray.500" mb={2}>
+          <Highlight query={currentTimeRange.name} styles={{ color: 'teal.600' }}>
+            {`Current time block: ${currentTimeRange.name}`}
+          </Highlight>
+        </Heading>
+      )}
       {mode === 'break' && selectedBreakActivity && (
         <Text fontSize="lg" mt={2} mb={2}>
           Activity: {selectedBreakActivity}

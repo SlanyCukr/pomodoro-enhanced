@@ -11,19 +11,21 @@ import {
   Center,
   Flex,
   Text,
-  FormControl,
-  FormLabel,
   createListCollection,
+  Separator,
+  Card,
+  Stack,
 } from '@chakra-ui/react';
-// import {
-//   SelectContent,
-//   SelectItem,
-//   SelectLabel,
-//   SelectRoot,
-//   SelectTrigger,
-//   SelectValueText,
-// } from '@/components/ui/select';
-import safeColors from '@/utils/safeColors';
+import {
+  SelectContent,
+  SelectItem,
+  SelectLabel,
+  SelectRoot,
+  SelectTrigger,
+  SelectValueText,
+} from '@/components/ui/select';
+import { FaTrash, FaRegSave } from 'react-icons/fa';
+import { IoMdAdd } from 'react-icons/io';
 
 function SettingsPage() {
   // Component state for settings
@@ -117,50 +119,14 @@ function SettingsPage() {
     setTimeRanges(timeRanges.filter((_, i) => i !== index));
   };
 
-  // Styles for activity groups using safeColors with appropriate text colors
-  const getActivityGroupStyles = (group) => {
-    // Base styles using safeColors for background
-    const styles = {
-      backgroundColor: safeColors[group],
-      borderColor: safeColors[group],
-    };
-
-    // Add appropriate text colors for each group
-    switch (group) {
-      case 'Yellow':
-        styles.color = '#854d0e';
-        break;
-      case 'Blue':
-        styles.color = '#1e40af';
-        break;
-      case 'Green':
-        styles.color = '#166534';
-        break;
-      case 'Red':
-        styles.color = '#991b1b';
-        break;
-      case 'Purple':
-        styles.color = '#5b21b6';
-        break;
-      case 'Orange':
-        styles.color = '#9a3412';
-        break;
-      default:
-        styles.color = '#1f2937';
-    }
-
-    return styles;
-  };
-
-  return (
-    <Container centerContent py={8}>
-      <Box display="flex" alignItems="center" width="100%" mb={4}>
-        <Heading mr="auto" ml="auto" mb={8} fontSize="5xl">
-          Settings
-        </Heading>
-      </Box>
-
-      <Box p={6} shadow="lg" borderWidth="1px" borderRadius="lg" width="100%">
+  const renderDurationSettingsCard = () => (
+    <Card.Root>
+      <Card.Header>
+        <Center>
+          <Heading size="3xl">Duration Settings</Heading>
+        </Center>
+      </Card.Header>
+      <Card.Body>
         <Field.Root mb={4}>
           <Field.Label>Work Duration (minutes)</Field.Label>
           <Input
@@ -171,7 +137,6 @@ function SettingsPage() {
           />
           <Field.HelperText>Enter work duration in minutes</Field.HelperText>
         </Field.Root>
-
         <Field.Root mb={4}>
           <Field.Label>Break Duration (minutes)</Field.Label>
           <Input
@@ -182,255 +147,290 @@ function SettingsPage() {
           />
           <Field.HelperText>Enter break duration in minutes</Field.HelperText>
         </Field.Root>
+      </Card.Body>
+    </Card.Root>
+  );
 
-        {/* New Time Ranges Section
-        <Box mt={6} mb={6}>
-          <Center>
-            <Heading fontSize="l" mb={4} mr="auto" ml="auto">
-              Time Ranges
-            </Heading>
-          </Center>
-
-          {timeRanges.map((range, index) => (
-            <Box key={index} mb={2} p={3} borderWidth="1px" borderRadius="md" bg="gray.50">
-              <Flex justifyContent="space-between" alignItems="center">
+  const renderTimeRangesCard = () => (
+    <Card.Root>
+      <Card.Header>
+        <Center>
+          <Heading size="3xl">Time Ranges</Heading>
+        </Center>
+      </Card.Header>
+      <Card.Body>
+        {timeRanges.map((range, index) => (
+          <Box key={index} mb={2} p={3} borderWidth="1px" borderRadius="md">
+            <Flex alignItems="center">
+              <Box flex="0 0 40%" overflow="hidden" textOverflow="ellipsis">
                 <Text fontWeight="bold">{range.name}</Text>
+              </Box>
+              <Box flex="0 0 30%" textAlign="center">
                 <Text>
                   {range.startHour}:{range.startMinute} - {range.endHour}:{range.endMinute}
                 </Text>
-                <Button size="sm" colorScheme="red" onClick={() => removeTimeRange(index)}>
+              </Box>
+              <Box flex="0 0 30%" textAlign="right">
+                <Button
+                  size="sm"
+                  colorPalette="red"
+                  variant="ghost"
+                  onClick={() => removeTimeRange(index)}
+                >
+                  <FaTrash />
                   Remove
                 </Button>
-              </Flex>
-            </Box>
-          ))}
-
-          <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="blue.50">
-            <FormControl mb={3}>
-              <FormLabel>Time Range Name</FormLabel>
-              <Input
-                placeholder="Work hours, Focus time, etc."
-                value={newTimeRange.name}
-                onChange={(e) => setNewTimeRange({ ...newTimeRange, name: e.target.value })}
-                bg="white"
-              />
-            </FormControl>
-
-            <Flex gap={3} mb={3}>
-              <FormControl flex="1">
-                <FormLabel>Start Time</FormLabel>
-                <Flex>
-                  <Box flex="1" mr={1}>
-                    <SelectRoot
-                      collection={hoursCollection}
-                      value={[newTimeRange.startHour]}
-                      onValueChange={(details) => {
-                        if (details.value[0]) {
-                          setNewTimeRange({
-                            ...newTimeRange,
-                            startHour: details.value[0],
-                          });
-                        }
-                      }}
-                      size="sm"
-                    >
-                      <SelectTrigger>
-                        <SelectValueText placeholder="Hour" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hoursCollection.items.map((hour) => (
-                          <SelectItem item={hour} key={`start-hour-${hour.value}`}>
-                            {hour.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </SelectRoot>
-                  </Box>
-                  <Text fontSize="xl" mx={1}>
-                    :
-                  </Text>
-                  <Box flex="1">
-                    <SelectRoot
-                      collection={minutesCollection}
-                      value={[newTimeRange.startMinute]}
-                      onValueChange={(details) => {
-                        if (details.value[0]) {
-                          setNewTimeRange({
-                            ...newTimeRange,
-                            startMinute: details.value[0],
-                          });
-                        }
-                      }}
-                      size="sm"
-                    >
-                      <SelectTrigger>
-                        <SelectValueText placeholder="Min" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {minutesCollection.items.map((minute) => (
-                          <SelectItem item={minute} key={`start-minute-${minute.value}`}>
-                            {minute.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </SelectRoot>
-                  </Box>
-                </Flex>
-              </FormControl>
-
-              <FormControl flex="1">
-                <FormLabel>End Time</FormLabel>
-                <Flex>
-                  <Box flex="1" mr={1}>
-                    <SelectRoot
-                      collection={hoursCollection}
-                      value={[newTimeRange.endHour]}
-                      onValueChange={(details) => {
-                        if (details.value[0]) {
-                          setNewTimeRange({
-                            ...newTimeRange,
-                            endHour: details.value[0],
-                          });
-                        }
-                      }}
-                      size="sm"
-                    >
-                      <SelectTrigger>
-                        <SelectValueText placeholder="Hour" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hoursCollection.items.map((hour) => (
-                          <SelectItem item={hour} key={`end-hour-${hour.value}`}>
-                            {hour.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </SelectRoot>
-                  </Box>
-                  <Text fontSize="xl" mx={1}>
-                    :
-                  </Text>
-                  <Box flex="1">
-                    <SelectRoot
-                      collection={minutesCollection}
-                      value={[newTimeRange.endMinute]}
-                      onValueChange={(details) => {
-                        if (details.value[0]) {
-                          setNewTimeRange({
-                            ...newTimeRange,
-                            endMinute: details.value[0],
-                          });
-                        }
-                      }}
-                      size="sm"
-                    >
-                      <SelectTrigger>
-                        <SelectValueText placeholder="Min" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {minutesCollection.items.map((minute) => (
-                          <SelectItem item={minute} key={`end-minute-${minute.value}`}>
-                            {minute.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </SelectRoot>
-                  </Box>
-                </Flex>
-              </FormControl>
+              </Box>
             </Flex>
-
-            <Button colorScheme="blue" size="md" width="100%" onClick={addTimeRange}>
-              Add Time Range
-            </Button>
           </Box>
-        </Box> */}
+        ))}
 
-        <Box mt={6}>
-          <Center>
-            <Heading fontSize="l" mb={4} mr="auto" ml="auto">
-              Break Activities
-            </Heading>
-          </Center>
+        <Field.Root mb={3} mt={6}>
+          <Field.Label>Time Range Name</Field.Label>
+          <Input
+            placeholder="Work hours, Focus time, etc."
+            value={newTimeRange.name}
+            onChange={(e) => setNewTimeRange({ ...newTimeRange, name: e.target.value })}
+          />
+        </Field.Root>
 
-          {Object.keys(breakActivities).map((group) => (
-            <Box
-              key={group}
-              mb={4}
-              borderWidth="1px"
-              borderRadius="md"
-              p={3}
-              style={getActivityGroupStyles(group)}
-            >
-              <Heading
-                size="md"
-                style={{
-                  textAlign: 'center',
-                  marginBottom: '0.75rem',
-                }}
-              >
-                {group} Activities
-              </Heading>
-
-              {breakActivities[group].map((activity, index) => (
-                <Box
-                  key={index}
-                  p={2}
-                  mb={1}
-                  display="flex"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  borderRadius="md"
-                  bg="white"
-                >
-                  {activity}
-                  <Button
-                    size="sm"
-                    colorScheme="red"
-                    variant="ghost"
-                    onClick={() => {
-                      setBreakActivities((prev) => ({
-                        ...prev,
-                        [group]: prev[group].filter((_, i) => i !== index),
-                      }));
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </Box>
-              ))}
-
-              <Box mt={3} display="flex" gap={2}>
-                <Input
-                  placeholder={`Add new ${group} activity`}
-                  value={newActivity[group] || ''}
-                  onChange={(e) => setNewActivity((prev) => ({ ...prev, [group]: e.target.value }))}
-                  flex={1}
-                  bg="white"
-                />
-                <Button
-                  onClick={() => {
-                    if (newActivity[group]?.trim()) {
-                      setBreakActivities((prev) => ({
-                        ...prev,
-                        [group]: [...prev[group], newActivity[group].trim()],
-                      }));
-                      setNewActivity((prev) => ({ ...prev, [group]: '' }));
+        <Stack>
+          <Field.Root flex="1">
+            <Field.Label>Start Time</Field.Label>
+            <Flex>
+              <Box flex="1" mr={1}>
+                <SelectRoot
+                  collection={hoursCollection}
+                  value={[newTimeRange.startHour]}
+                  onValueChange={(details) => {
+                    if (details.value[0]) {
+                      setNewTimeRange({
+                        ...newTimeRange,
+                        startHour: details.value[0],
+                      });
                     }
                   }}
-                  bg="white"
+                  size="sm"
+                  width="60px"
                 >
-                  Add
+                  <SelectTrigger>
+                    <SelectValueText placeholder="Hour" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hoursCollection.items.map((hour) => (
+                      <SelectItem item={hour} key={`start-hour-${hour.value}`}>
+                        {hour.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectRoot>
+              </Box>
+              <Text fontSize="xl" mx={1}>
+                :
+              </Text>
+              <Box flex="1">
+                <SelectRoot
+                  collection={minutesCollection}
+                  value={[newTimeRange.startMinute]}
+                  onValueChange={(details) => {
+                    if (details.value[0]) {
+                      setNewTimeRange({
+                        ...newTimeRange,
+                        startMinute: details.value[0],
+                      });
+                    }
+                  }}
+                  size="sm"
+                  width="60px"
+                >
+                  <SelectTrigger>
+                    <SelectValueText placeholder="Min" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {minutesCollection.items.map((minute) => (
+                      <SelectItem item={minute} key={`start-minute-${minute.value}`}>
+                        {minute.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectRoot>
+              </Box>
+            </Flex>
+          </Field.Root>
+
+          <Field.Root flex="1">
+            <Field.Label>End Time</Field.Label>
+            <Flex>
+              <Box flex="1" mr={1}>
+                <SelectRoot
+                  collection={hoursCollection}
+                  value={[newTimeRange.endHour]}
+                  onValueChange={(details) => {
+                    if (details.value[0]) {
+                      setNewTimeRange({
+                        ...newTimeRange,
+                        endHour: details.value[0],
+                      });
+                    }
+                  }}
+                  size="sm"
+                  width="60px"
+                >
+                  <SelectTrigger>
+                    <SelectValueText placeholder="Hour" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hoursCollection.items.map((hour) => (
+                      <SelectItem item={hour} key={`end-hour-${hour.value}`}>
+                        {hour.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectRoot>
+              </Box>
+              <Text fontSize="xl" mx={1}>
+                :
+              </Text>
+              <Box flex="1">
+                <SelectRoot
+                  collection={minutesCollection}
+                  value={[newTimeRange.endMinute]}
+                  onValueChange={(details) => {
+                    if (details.value[0]) {
+                      setNewTimeRange({
+                        ...newTimeRange,
+                        endMinute: details.value[0],
+                      });
+                    }
+                  }}
+                  size="sm"
+                  width="60px"
+                >
+                  <SelectTrigger>
+                    <SelectValueText placeholder="Min" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {minutesCollection.items.map((minute) => (
+                      <SelectItem item={minute} key={`end-minute-${minute.value}`}>
+                        {minute.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectRoot>
+              </Box>
+            </Flex>
+          </Field.Root>
+        </Stack>
+
+        <Center marginTop="2rem" marginBottom="2">
+          <Button colorPalette="green" size="md" width="50%" variant="ghost" onClick={addTimeRange}>
+            <IoMdAdd />
+            Add Time Range
+          </Button>
+        </Center>
+      </Card.Body>
+    </Card.Root>
+  );
+
+  const renderBreakActivitiesCard = () => (
+    <Card.Root>
+      <Card.Header>
+        <Center>
+          <Heading size="3xl">Break Activities</Heading>
+        </Center>
+      </Card.Header>
+      <Card.Body>
+        {Object.keys(breakActivities).map((group) => (
+          <Box key={group} mb={4} borderWidth="0px" borderRadius="md" p={3}>
+            <Heading
+              size="lg"
+              style={{
+                textAlign: 'center',
+                marginBottom: '0.75rem',
+              }}
+            >
+              {group} Activities
+            </Heading>
+
+            {breakActivities[group].map((activity, index) => (
+              <Box
+                key={index}
+                p={2}
+                mb={1}
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                borderRadius="md"
+                borderWidth="2px"
+              >
+                {activity}
+                <Button
+                  size="sm"
+                  colorPalette="red"
+                  variant="ghost"
+                  onClick={() => {
+                    setBreakActivities((prev) => ({
+                      ...prev,
+                      [group]: prev[group].filter((_, i) => i !== index),
+                    }));
+                  }}
+                >
+                  <FaTrash />
+                  Remove
                 </Button>
               </Box>
-            </Box>
-          ))}
-        </Box>
+            ))}
 
-        <Button colorScheme="blue" size="lg" width="100%" mt={6} onClick={saveSettings}>
-          Save Settings
-        </Button>
+            <Box mt={3} display="flex" gap={2}>
+              <Input
+                _placeholder={{ color: 'grey' }}
+                placeholder={`Add new ${group} activity`}
+                value={newActivity[group] || ''}
+                onChange={(e) => setNewActivity((prev) => ({ ...prev, [group]: e.target.value }))}
+                flex={1}
+              />
+              <Button
+                onClick={() => {
+                  if (newActivity[group]?.trim()) {
+                    setBreakActivities((prev) => ({
+                      ...prev,
+                      [group]: [...prev[group], newActivity[group].trim()],
+                    }));
+                    setNewActivity((prev) => ({ ...prev, [group]: '' }));
+                  }
+                }}
+                colorPalette="green"
+                variant="ghost"
+              >
+                <IoMdAdd />
+                Add
+              </Button>
+            </Box>
+          </Box>
+        ))}
+      </Card.Body>
+    </Card.Root>
+  );
+
+  return (
+    <Container centerContent py={8}>
+      <Box display="flex" alignItems="center" width="100%" mb={4}>
+        <Heading mr="auto" ml="auto" mb={8} fontSize="5xl">
+          Settings
+        </Heading>
       </Box>
+
+      <Stack spacing={6} width="100%">
+        {renderDurationSettingsCard()}
+        {renderTimeRangesCard()}
+        {renderBreakActivitiesCard()}
+        <Center marginTop="2rem">
+          <Button colorPalette="blue" size="lg" width="50%" onClick={saveSettings}>
+            <FaRegSave />
+            Save Settings
+          </Button>
+        </Center>
+      </Stack>
     </Container>
   );
 }
