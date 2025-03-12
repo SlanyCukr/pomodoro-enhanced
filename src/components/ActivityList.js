@@ -1,39 +1,59 @@
 import React from 'react';
-import { Button, Heading, Separator, Box } from '@chakra-ui/react';
+import { Button, Heading, Box, Text } from '@chakra-ui/react';
 import safeColors from '@/utils/safeColors';
+import { AiOutlineSelect } from 'react-icons/ai';
 
 const ActivityList = ({ breakActivities, onSelect, onClose, showActivityList }) => {
   if (!showActivityList) return null;
 
   return (
-    <Box className="space-y-6 p-6 bg-gray-50 rounded-lg" marginTop={6}>
-      {Object.entries(breakActivities).map(([group, activities], index) => (
-        <div
-          key={group}
-          style={{ backgroundColor: safeColors[group], padding: '16px', borderRadius: '8px' }}
-        >
-          <Heading size="md" mb={4}>
-            {group}
+    <Box className="space-y-4" marginTop={6}>
+      {Object.entries(breakActivities).map(([group, activities]) => (
+        <Box key={group} mb={4} borderWidth="0px" borderRadius="md" p={3}>
+          <Heading
+            size="lg"
+            style={{
+              textAlign: 'center',
+              marginBottom: '0.75rem',
+              color: '#333',
+              backgroundColor: safeColors[group],
+              padding: '8px',
+              borderRadius: '8px',
+            }}
+          >
+            {group} Activities
           </Heading>
-          <div className="grid gap-2">
-            {activities.map((activity, idx) => (
+
+          {activities.map((activity, index) => (
+            <Box
+              key={index}
+              p={2}
+              mb={2}
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              borderRadius="md"
+              borderWidth="2px"
+              _hover={{ backgroundColor: 'gray.900' }}
+            >
+              <Text fontWeight="medium" flex="1">
+                {activity}
+              </Text>
               <Button
-                key={idx}
-                variant="outline"
-                size="md"
-                justifyContent="flex-start"
+                size="sm"
+                colorPalette="blue"
+                variant="ghost"
                 onClick={() => {
                   onSelect(activity);
                   onClose();
                 }}
-                backgroundColor="white"
               >
-                {activity}
+                <AiOutlineSelect />
+                Select
               </Button>
-            ))}
-          </div>
-          {index < Object.entries(breakActivities).length - 1 && <Separator my={6} />}
-        </div>
+            </Box>
+          ))}
+        </Box>
       ))}
     </Box>
   );

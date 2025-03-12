@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, Center } from '@chakra-ui/react';
 import safeColors from '@/utils/safeColors';
+import { PiSpinnerGapFill } from 'react-icons/pi';
 
 const SpinningWheel = ({ activities, onSpinEnd }) => {
   const [rotation, setRotation] = useState(0);
@@ -188,7 +189,10 @@ const SpinningWheel = ({ activities, onSpinEnd }) => {
           onClick={spin}
           disabled={isSpinning}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50"
+          variant="solid"
+          colorPalette="blue"
         >
+          <PiSpinnerGapFill />
           {isSpinning ? 'Spinning...' : 'Spin'}
         </Button>
       </Center>
