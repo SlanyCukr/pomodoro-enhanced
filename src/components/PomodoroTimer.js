@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Button, Heading, Text, HStack, ProgressCircle, Highlight } from '@chakra-ui/react';
 import { LuArrowRight } from 'react-icons/lu';
 import BreakActivitySelector from './BreakActivitySelector';
+import WorkSessionPrepDialog from './WorkSessionPrepDialog';
 
 const PomodoroTimer = () => {
   // Initialize state with null values, will be set from localStorage
@@ -13,6 +14,7 @@ const PomodoroTimer = () => {
   const [timeLeft, setTimeLeft] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState('work'); // 'work' or 'break'
+  const [offTrackCount, setOffTrackCount] = useState(0); // Track number of times user went off-track
 
   // New overtime state
   const [isOvertime, setIsOvertime] = useState(false);
@@ -39,6 +41,10 @@ const PomodoroTimer = () => {
   const timerStartTimeLeft = useRef(null);
   // Track the previous mode to detect actual mode changes
   const prevModeRef = useRef(mode);
+
+  const incrementOffTrackCount = () => {
+    setOffTrackCount((prevCount) => prevCount + 1);
+  };
 
   // Function to send a desktop notification and play sound
   const notifyUser = useCallback((message) => {
@@ -131,7 +137,19 @@ const PomodoroTimer = () => {
       timerStartTimeLeft.current = 0;
       // We don't clear the interval or stop the timer
     } else {
-      // For break mode, behavior remains the same
+      // For break mode, save the session before transitioning back to work
+      const breakSession = {
+        id: Date.now(),
+        type: 'break',
+        startTime: timerStartTimestamp.current,
+        duration: breakDuration,
+        offTrackCount: 0,
+        overtime: false,
+        activity: selectedBreakActivity,
+      };
+      saveSessionToLocalStorage(breakSession);
+
+      // Then proceed with break completion
       clearInterval(timerId.current);
       setIsRunning(false);
       notifyUser('Break over! Time to work.');
@@ -140,9 +158,26 @@ const PomodoroTimer = () => {
       setSelectedBreakActivity('');
       setIsOvertime(false);
       setOvertimeSeconds(0);
+      setOffTrackCount(0); // Reset off-track count when new work session starts
       timerStartTimestamp.current = null;
     }
-  }, [mode, notifyUser, workDuration]);
+  }, [mode, notifyUser, workDuration, breakDuration, selectedBreakActivity]);
+
+  // Make saveSessionToLocalStorage available at component level
+  const saveSessionToLocalStorage = (session) => {
+    const savedSessions = localStorage.getItem('pomodoroSessions');
+    let sessions = [];
+    if (savedSessions) {
+      try {
+        sessions = JSON.parse(savedSessions);
+      } catch (error) {
+        console.error('Error parsing session history:', error);
+      }
+    }
+    sessions.push(session);
+    localStorage.setItem('pomodoroSessions', JSON.stringify(sessions));
+    console.log('Session saved:', session);
+  };
 
   // Update the browser tab title whenever timeLeft, overtime or mode changes
   useEffect(() => {
@@ -266,6 +301,45 @@ const PomodoroTimer = () => {
     return () => clearInterval(interval);
   }, [timeRanges]);
 
+  useEffect(() => {
+    const saveSessionToLocalStorage = (session) => {
+      const savedSessions = localStorage.getItem('pomodoroSessions');
+      let sessions = [];
+      if (savedSessions) {
+        try {
+          sessions = JSON.parse(savedSessions);
+        } catch (error) {
+          console.error('Error parsing session history:', error);
+        }
+      }
+      sessions.push(session);
+      localStorage.setItem('pomodoroSessions', JSON.stringify(sessions));
+      console.log('Session saved:', session); // Log the saved session
+    };
+
+    if (!isRunning && timeLeft === 0 && timerStartTimestamp.current) {
+      const session = {
+        id: Date.now(),
+        type: mode,
+        startTime: timerStartTimestamp.current,
+        duration: mode === 'work' ? workDuration : breakDuration,
+        offTrackCount,
+        overtime: isOvertime,
+        activity: selectedBreakActivity,
+      };
+      saveSessionToLocalStorage(session);
+    }
+  }, [
+    isRunning,
+    timeLeft,
+    mode,
+    workDuration,
+    breakDuration,
+    offTrackCount,
+    isOvertime,
+    selectedBreakActivity,
+  ]);
+
   const handleBreakActivitySelect = (activity) => {
     setSelectedBreakActivity(activity);
     setMode('break');
@@ -276,9 +350,18 @@ const PomodoroTimer = () => {
     timerStartTimestamp.current = null;
   };
 
+  // Add state for the prep dialog
+  const [isPrepDialogOpen, setIsPrepDialogOpen] = useState(false);
+
   // Toggle start/pause and play start sound if starting
   const toggleTimer = () => {
     const willBeRunning = !isRunning;
+
+    // If we are in work mode and going to start the timer, show the prep dialog
+    if (willBeRunning && mode === 'work' && !isOvertime) {
+      setIsPrepDialogOpen(true);
+      return; // Don't start the timer yet
+    }
 
     // If the timer is currently paused, play the start sound
     if (willBeRunning && soundRefPomodoroStart.current) {
@@ -309,6 +392,22 @@ const PomodoroTimer = () => {
     setIsRunning(willBeRunning);
   };
 
+  // Handle actual start of session after prep
+  const handleStartAfterPrep = () => {
+    // Play start sound
+    if (soundRefPomodoroStart.current) {
+      soundRefPomodoroStart.current.currentTime = 0;
+      soundRefPomodoroStart.current.play().catch((err) => {
+        console.error('Start sound playback failed:', err);
+      });
+    }
+
+    // Start the timer
+    timerStartTimestamp.current = Date.now();
+    timerStartTimeLeft.current = timeLeft;
+    setIsRunning(true);
+  };
+
   // Reset the timer to the full duration of the current mode
   const resetTimer = () => {
     clearInterval(timerId.current);
@@ -323,10 +422,21 @@ const PomodoroTimer = () => {
   const skipSession = () => {
     clearInterval(timerId.current);
     setIsRunning(false);
-    timerStartTimestamp.current = null;
 
     if (mode === 'work') {
-      // For a work session, notify and open the break activity selector
+      // For a work session, save it before transitioning to break
+      const workSession = {
+        id: Date.now(),
+        type: 'work',
+        startTime: timerStartTimestamp.current || Date.now() - (workDuration - timeLeft) * 1000,
+        duration: workDuration - timeLeft,
+        offTrackCount,
+        overtime: isOvertime,
+        activity: null,
+      };
+      saveSessionToLocalStorage(workSession);
+
+      // Now notify and open the break activity selector
       notifyUser('Work session skipped! Please select a break activity.');
       setIsBreakActivityModalOpen(true);
       setIsOvertime(false);
@@ -337,7 +447,9 @@ const PomodoroTimer = () => {
       setMode('work');
       setTimeLeft(workDuration);
       setSelectedBreakActivity('');
+      setOffTrackCount(0); // Reset off-track count when skipping from break to work
     }
+    timerStartTimestamp.current = null;
   };
 
   // Helper function to format seconds as mm:ss
@@ -416,6 +528,14 @@ const PomodoroTimer = () => {
           Reset
         </Button>
         <Button
+          variant="outline"
+          colorScheme="yellow"
+          onClick={incrementOffTrackCount}
+          title="Increment off-track count"
+        >
+          Off-Track ({offTrackCount})
+        </Button>
+        <Button
           colorScheme="orange"
           variant="outline"
           onClick={skipSession}
@@ -430,6 +550,13 @@ const PomodoroTimer = () => {
         onClose={() => setIsBreakActivityModalOpen(false)}
         breakActivities={breakActivities}
         onSelect={handleBreakActivitySelect}
+      />
+
+      {/* Add WorkSessionPrepDialog */}
+      <WorkSessionPrepDialog
+        isOpen={isPrepDialogOpen}
+        onClose={() => setIsPrepDialogOpen(false)}
+        onStartSession={handleStartAfterPrep}
       />
     </Box>
   );

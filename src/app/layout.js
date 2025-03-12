@@ -43,12 +43,21 @@ export default function RootLayout({ children }) {
                 <NextLink href="/free-time">Free time</NextLink>
               </ChakraLink>
               <ChakraLink
+                mr={4}
                 asChild
                 colorPalette={pathname === '/settings' ? 'accent' : 'gray'}
                 variant={pathname === '/settings' ? 'underline' : 'plain'}
                 fontWeight={pathname === '/settings' ? 'bold' : 'normal'}
               >
                 <NextLink href="/settings">Settings</NextLink>
+              </ChakraLink>
+              <ChakraLink
+                asChild
+                colorPalette={pathname === '/timeline' ? 'accent' : 'gray'}
+                variant={pathname === '/timeline' ? 'underline' : 'plain'}
+                fontWeight={pathname === '/timeline' ? 'bold' : 'normal'}
+              >
+                <NextLink href="/timeline">Timeline</NextLink>
               </ChakraLink>
             </Box>
           </header>
